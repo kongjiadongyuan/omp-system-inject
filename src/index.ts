@@ -138,7 +138,11 @@ export default async function systemInject(pi: ExtensionAPI) {
 		startupWarnings = [`failed to read model catalog at load: ${(e as Error).message}`];
 	}
 	// 2) Follow omp settings changes (disabledProviders / enabledModels) live.
-	const unsubscribe = (settings as any).onEffectiveChange?.([cfgEnabledModels, cfgDisabledProviders], () => resync(undefined, true));
+	// (Guarded: `omp plugin install` validates extensions without initialized Settings.)
+	let unsubscribe: (() => void) | undefined;
+	try {
+		unsubscribe = (settings as any).onEffectiveChange?.([cfgEnabledModels, cfgDisabledProviders], () => resync(undefined, true));
+	} catch {}
 
 	pi.on("session_start", async (_e, ctx) => {
 		lastCtx = ctx;

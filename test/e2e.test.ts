@@ -17,6 +17,12 @@ const modelsYml = (port: number) => `providers:
     models:
       - {id: mock-small, name: Mock Small, reasoning: false, input: [text], cost: {input: 1, output: 2, cacheRead: 0.1, cacheWrite: 0.5}, contextWindow: 32000, maxTokens: 4096}
       - {id: mock-big, name: Mock Big, reasoning: true, input: [text, image], cost: {input: 3, output: 6, cacheRead: 0.3, cacheWrite: 1}, contextWindow: 128000, maxTokens: 8192}
+  blizo:
+    baseUrl: http://127.0.0.1:${port}/v1
+    api: openai-completions
+    apiKey: dummy
+    models:
+      - {id: z-ai/glm-5.3, name: GLM 5.3 (gateway), reasoning: false, input: [text], cost: {input: 0.5, output: 1, cacheRead: 0, cacheWrite: 0}, contextWindow: 64000, maxTokens: 2048}
 `;
 function omp(args: string[]) {
 	const env = baseEnv();
@@ -86,6 +92,7 @@ beforeAll(async () => {
   - {injectId: bob,   model: mock-small, mode: prefix, systemPrompt: "BOB-GLOBAL"}
   - {injectId: carol, model: mock-big,   mode: suffix, systemPrompt: "CAROL"}
   - {injectId: ghost, model: no-such-model, systemPrompt: "x"}
+  - {injectId: glm53, model: z-ai/glm-5.3, mode: prefix, systemPrompt: "GLM-PERSONA"}
 `);
 	w(`${proj}/.omp/system-inject.yml`, `injects:
   - {injectId: bob, systemPrompt: "BOB-PROJECT"}
@@ -99,7 +106,7 @@ afterAll(() => server?.kill());
 describe("e2e", () => {
 	test("character group: one model per entry, originals untouched, params inherited, missing model skipped", () => {
 		const ms = characters();
-		expect(ms.map(m => m.id).sort()).toEqual(["alice--mock-small", "bob--mock-small", "carol--mock-big", "dave--mock-big"]);
+		expect(ms.map(m => m.id).sort()).toEqual(["alice--mock-small", "bob--mock-small", "carol--mock-big", "dave--mock-big", "glm53--z-ai/glm-5.3"]);
 		const byId = Object.fromEntries(ms.map(m => [m.id, m]));
 		expect(byId["alice--mock-small"].name).toBe("[alice] Mock Small");
 		const orig = JSON.parse(omp(["models", "mock", "--json"]).out).models;
@@ -152,7 +159,7 @@ describe("e2e", () => {
 
 	// ---- (b) availability follows omp's own enable/disable mechanisms ----
 	test("disabledProviders hides derived character models", () => {
-		fs.writeFileSync(settingsFile(), "disabledProviders: [mock]\n");
+		fs.writeFileSync(settingsFile(), "disabledProviders: [mock, blizo]\n");
 		try { expect(characters()).toEqual([]); } finally { fs.rmSync(settingsFile()); }
 	}, 30000);
 
@@ -167,7 +174,7 @@ describe("e2e", () => {
 		fs.writeFileSync(settingsFile(), "enabledModels: [mock/mock-big]\n");
 		try {
 			const r = ask("mock/mock-big");
-			expect(r.out + r.err).toContain('add "character/*" to enabledModels');
+			expect(r.out + r.err).toContain('add "character/**" to enabledModels');
 		} finally { fs.rmSync(settingsFile()); }
 	}, 60000);
 
@@ -189,6 +196,39 @@ describe("e2e", () => {
 		} finally { fs.rmSync(settingsFile()); }
 	}, 60000);
 
+	test("slash-containing original id: character model listed, selectable, injected on the wire", () => {
+		const m = characters().find(x => x.id === "glm53--z-ai/glm-5.3");
+		expect(m?.name).toBe("[glm53] GLM 5.3 (gateway)");
+		expect(m?.contextWindow).toBe(64000);
+		const r = ask("character/glm53--z-ai/glm-5.3");
+		expect(r.code).toBe(0);
+		expect(r.body.model).toBe("z-ai/glm-5.3");
+		expect(r.system.startsWith("GLM-PERSONA\n\n§ Role")).toBe(true);
+	}, 60000);
+
+	test("slash id + enabledModels (exact original selector, character/**): no warning, visible", () => {
+		fs.writeFileSync(settingsFile(), 'enabledModels: ["blizo/z-ai/glm-5.3", "character/**"]\n');
+		try {
+			expect(characters().map(x => x.id)).toEqual(["glm53--z-ai/glm-5.3"]);
+			const r = ask("character/glm53--z-ai/glm-5.3");
+			expect(r.system.startsWith("GLM-PERSONA")).toBe(true);
+			expect(r.out + r.err).not.toContain("matches no character model");
+		} finally { fs.rmSync(settingsFile()); }
+	}, 60000);
+
+	test("slash id + character/* (single star): targeted hint to use character/**", async () => {
+		fs.writeFileSync(settingsFile(), 'enabledModels: [mock/mock-big, "blizo/z-ai/glm-5.3", "character/*"]\n');
+		try {
+			const r = ask("mock/mock-big");
+			expect(r.out + r.err).toContain('"character/*" does not match ids containing "/" (character/glm53--z-ai/glm-5.3); use "character/**"');
+			// Registered (original is enabled) but omp's picker scope hides the slash id under "*".
+			const c = await rpc("mock/mock-big");
+			try {
+				expect((await c.models()).filter(m => m.startsWith("character/"))).toEqual(["character/carol--mock-big", "character/dave--mock-big"]);
+			} finally { c.close(); }
+		} finally { fs.rmSync(settingsFile()); }
+	}, 60000);
+
 	test("live: settings edits while running add/remove character models", async () => {
 		const c = await rpc("mock/mock-big");
 		try {
@@ -198,7 +238,7 @@ describe("e2e", () => {
 			let ms = await c.models();
 			expect(ms).toContain("character/carol--mock-big");
 			expect(ms).not.toContain("character/alice--mock-small");
-			fs.writeFileSync(settingsFile(), "disabledProviders: [mock]\n");
+			fs.writeFileSync(settingsFile(), "disabledProviders: [mock, blizo]\n");
 			await Bun.sleep(2500);
 			ms = await c.models();
 			expect(ms.filter(m => m.startsWith("character/"))).toEqual([]);

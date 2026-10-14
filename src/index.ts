@@ -6,6 +6,7 @@ import { cfgDisabledProviders, cfgEnabledModels } from "@oh-my-pi/pi-coding-agen
 import { createAssistantMessageEventStream, streamSimple, type Api, type Context, type Model } from "@oh-my-pi/pi-ai";
 import { loadConfig, type InjectEntry } from "./config";
 import { compose } from "./compose";
+import { matchOriginals } from "./match";
 
 export const PROVIDER = "character";
 const API = "character-inject" as Api;
@@ -42,7 +43,7 @@ export default async function systemInject(pi: ExtensionAPI) {
 		const selectable = selectableOriginals(reg);
 		const next = new Map<string, Target>();
 		for (const entry of entries) {
-			const matches = selectable.filter(m => m.id === entry.model);
+			const matches = matchOriginals(selectable, entry.model);
 			if (matches.length === 0) {
 				warnings.push(`injectId "${entry.injectId}": model "${entry.model}" is not available/enabled in omp; skipped`);
 				continue;
@@ -80,7 +81,14 @@ export default async function systemInject(pi: ExtensionAPI) {
 		if (patterns.length && models.length) {
 			const planned = models.map(m => ({ ...m, provider: PROVIDER, baseUrl: CHARACTER_BASE_URL })) as unknown as Model<Api>[];
 			const visible = filterAvailableModelsByEnabledPatterns(planned, patterns, settings);
-			if (visible.length === 0) warnings.push(`enabledModels is set but matches no character model; add "${PROVIDER}/*" to enabledModels to show them`);
+			if (visible.length === 0) {
+				warnings.push(`enabledModels is set but matches no character model; add "${PROVIDER}/**" to enabledModels to show them`);
+			} else if (patterns.includes(`${PROVIDER}/*`)) {
+				// Glob "*" does not cross "/", so ids derived from slash-containing originals stay hidden.
+				const shown = new Set(visible.map(m => m.id));
+				const hidden = planned.filter(m => !shown.has(m.id) && m.id.includes("/")).map(m => `${PROVIDER}/${m.id}`);
+				if (hidden.length) warnings.push(`"${PROVIDER}/*" does not match ids containing "/" (${hidden.join(", ")}); use "${PROVIDER}/**" instead`);
+			}
 		}
 		return { files, warnings, changed };
 	}

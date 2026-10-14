@@ -20,7 +20,12 @@ A character model exists only while its original is selectable: credentialed, pr
 `disabledProviders`, and (if set) matched by `enabledModels`. Changes are followed live
 (settings change listener + re-check before each turn + config file watch).
 Note: with an `enabledModels` allow-list, omp's picker only shows listed models, so add
-`"character/*"` to it (a startup warning says so).
+`"character/**"` to it (a startup warning says so). Use `**`, not `*`: a single `*` does not cross `/`,
+so characters built on slash ids (e.g. `character/glm53--z-ai/glm-5.3` from gateway id `z-ai/glm-5.3`)
+would stay hidden. The original itself must also be enabled, by its exact selector (e.g. `blizo/z-ai/glm-5.3`).
+
+`model:` in `system-inject.yml` is matched verbatim: exact model id first (ids may contain `/`), otherwise
+`provider/id`.
 
 ## Injection scope
 Injection happens inside the `character` provider's stream function, so EVERY request made with a

@@ -9,7 +9,7 @@ const MODES: Mode[] = ["replace", "prefix", "suffix"];
 
 export interface InjectEntry {
 	injectId: string;
-	model: string; // model id (provider ignored; a "provider/" prefix is stripped)
+	model: string; // exact model id, or "provider/id" selector (resolved at match time)
 	mode: Mode;
 	systemPrompt: string; // resolved text
 	source: string; // config file the entry came from
@@ -115,7 +115,9 @@ export function loadConfig(cwd: string, files = configFiles(cwd)): LoadResult {
 			catch { warnings.push(`${where}: systemPrompt file not found: ${p.systemPromptFile}`); continue; }
 		}
 		if (text === undefined || !text.trim()) { warnings.push(`${where}: "systemPrompt" is required and must be non-empty`); continue; }
-		const model = p.model.includes("/") ? p.model.slice(p.model.lastIndexOf("/") + 1) : p.model;
+		// Kept verbatim: ids may themselves contain "/" (gateway ids like "z-ai/glm-5.3").
+		// "provider/id" vs bare id is resolved against the live catalog (see matchOriginals).
+		const model = p.model.trim();
 		entries.push({ injectId: p.injectId, model, mode, systemPrompt: text.trim(), source: p.source });
 	}
 	return { entries, warnings, files };

@@ -4,6 +4,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { loadConfig, configFiles } from "../src/config";
 import { compose, splitBase } from "../src/compose";
+import { matchOriginals } from "../src/match";
 
 let root: string, user: string, proj: string;
 const w = (p: string, s: string) => { fs.mkdirSync(path.dirname(p), { recursive: true }); fs.writeFileSync(p, s); };
@@ -30,9 +31,17 @@ describe("layering & merge", () => {
 		expect([a.model, a.mode, a.systemPrompt]).toEqual(["m1", "suffix", "P"]);
 		expect(r.entries.find(e => e.injectId === "keep")!.systemPrompt).toBe("K");
 	});
-	test("provider prefix ignored", () => {
-		w(`${proj}/.omp/system-inject.yml`, "injects: [{injectId: a, model: openai/gpt-x, systemPrompt: P}]");
-		expect(loadConfig(proj).entries[0].model).toBe("gpt-x");
+	test("model kept verbatim (trimmed); provider/id resolved later", () => {
+		w(`${proj}/.omp/system-inject.yml`, "injects: [{injectId: a, model: ' openai/gpt-x ', systemPrompt: P}, {injectId: b, model: z-ai/glm-5.3, systemPrompt: P}]");
+		expect(loadConfig(proj).entries.map(e => e.model)).toEqual(["openai/gpt-x", "z-ai/glm-5.3"]);
+	});
+	test("matchOriginals: exact id wins, else provider/id; no double-match", () => {
+		const ms = [{ provider: "openai", id: "gpt-x" }, { provider: "blizo", id: "z-ai/glm-5.3" }, { provider: "z-ai", id: "glm-5.3" }];
+		expect(matchOriginals(ms, "gpt-x")).toEqual([ms[0]]);
+		expect(matchOriginals(ms, "openai/gpt-x")).toEqual([ms[0]]);
+		expect(matchOriginals(ms, "z-ai/glm-5.3")).toEqual([ms[1]]); // exact id beats provider/id of ms[2]
+		expect(matchOriginals(ms, "blizo/z-ai/glm-5.3")).toEqual([ms[1]]);
+		expect(matchOriginals(ms, "nope")).toEqual([]);
 	});
 	test("default mode is prefix", () => {
 		w(`${proj}/.omp/system-inject.yml`, "injects: [{injectId: a, model: m, systemPrompt: P}]");

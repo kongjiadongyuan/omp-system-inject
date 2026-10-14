@@ -1,0 +1,16 @@
+{
+  "name": "omp-system-inject",
+  "version": "0.1.0",
+  "description": "oh-my-pi plugin: 'character' model group that injects system prompts (replace/prefix/suffix) per model",
+  "type": "module",
+  "license": "MIT",
+  "keywords": ["omp", "oh-my-pi", "omp-plugin", "system-prompt"],
+  "files": ["src", "examples/system-inject.yml", "examples/alice.md", "README.md"],
+  "omp": {
+    "name": "system-inject",
+    "extensions": ["./src/index.ts"]
+  },
+  "peerDependencies": { "@oh-my-pi/pi-coding-agent": ">=18.10.4" },
+  "peerDependenciesMeta": { "@oh-my-pi/pi-coding-agent": { "optional": true } },
+  "scripts": { "test": "bun test", "sandbox": "./dev-sandbox.sh" }
+}

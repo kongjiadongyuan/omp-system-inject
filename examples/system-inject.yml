@@ -1,0 +1,10 @@
+# ~/.omp/agent/system-inject.yml (global)  or  <project>/.omp/system-inject.yml (project, wins; merged by injectId)
+injects:
+  - injectId: alice          # required; model shows as "[alice] <original name>" in group "character"
+    model: mock-small        # model id; "provider/" prefix is ignored
+    mode: replace            # replace | prefix | suffix (default prefix)
+    systemPrompt: alice.md   # *.md = file relative to THIS config file; otherwise inline text
+  - injectId: bob
+    model: mock-small
+    mode: prefix
+    systemPrompt: "You are Bob."

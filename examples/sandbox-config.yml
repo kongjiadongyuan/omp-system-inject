@@ -1,0 +1,6 @@
+# Seeded into the sandbox as ~/.omp/agent/config.yml
+setupVersion: 2            # >= CURRENT_SETUP_VERSION (pi-tui/src/setup/setup-version.ts) -> wizard considered done
+startup:
+  setupWizard: false       # never show the first-run provider setup, even after an omp setup-version bump
+modelRoles:
+  default: mock/mock-small # start on the local mock model

@@ -1,0 +1,20 @@
+providers:
+  mock:
+    baseUrl: http://127.0.0.1:__PORT__/v1
+    api: openai-completions
+    apiKey: dummy
+    models:
+      - id: mock-small
+        name: Mock Small
+        reasoning: false
+        input: [text]
+        cost: {input: 1, output: 2, cacheRead: 0.1, cacheWrite: 0.5}
+        contextWindow: 32000
+        maxTokens: 4096
+      - id: mock-big
+        name: Mock Big
+        reasoning: true
+        input: [text, image]
+        cost: {input: 3, output: 6, cacheRead: 0.3, cacheWrite: 1}
+        contextWindow: 128000
+        maxTokens: 8192

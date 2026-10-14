@@ -6,7 +6,9 @@ and injects a system prompt (replace / prefix / suffix) into omp's persona secti
 content (preamble, § Runtime tools/skills/rules, eval preludes, <project-context>/AGENTS.md) is never
 edited and always follows the injected head.
 
-- Install: `cp -r` / symlink into `~/.omp/agent/extensions/` or run `omp -e /path/src/index.ts`
+- Install: `omp plugin install github:<user>/omp-system-inject` (or `https://github.com/<user>/omp-system-inject`;
+  `--scope project` for per-project). Dev: `omp plugin link /path/to/omp-system-inject` or `omp -e src/index.ts`.
+  Update: `omp plugin upgrade`; remove: `omp plugin uninstall omp-system-inject`.
 - Config: see `examples/system-inject.yml`
 - Tests: `bun test` (unit + e2e against a real omp and the mock OpenAI endpoint in `test/mock-server.ts`)
 - Sandbox: `./dev-sandbox.sh` (interactive) / `./dev-sandbox.sh -p --model character/alice--mock-small hi`;

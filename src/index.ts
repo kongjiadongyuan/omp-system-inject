@@ -9,6 +9,7 @@ import { compose } from "./compose";
 
 export const PROVIDER = "character";
 const API = "character-inject" as Api;
+const CHARACTER_BASE_URL = "character://inject";
 const SEP = "--"; // character model id = <injectId>--<original id>
 
 interface Target { entry: InjectEntry; original: Model<Api> }
@@ -65,7 +66,7 @@ export default async function systemInject(pi: ExtensionAPI) {
 			pi.unregisterProvider(PROVIDER);
 			if (models.length > 0) {
 				pi.registerProvider(PROVIDER, {
-					baseUrl: "character://inject",
+					baseUrl: CHARACTER_BASE_URL,
 					apiKey: "character-inject-noauth",
 					api: API,
 					models: models as any,
@@ -73,9 +74,12 @@ export default async function systemInject(pi: ExtensionAPI) {
 				});
 			}
 		}
+		// Visibility check uses ONLY the plugin's own planned models (never registry state, whose
+		// contents depend on registration timing): full Model shapes as they will be registered.
 		const patterns = cfgEnabledModels.get(settings) ?? [];
 		if (patterns.length && models.length) {
-			const visible = filterAvailableModelsByEnabledPatterns(reg.getAvailable().filter(m => m.provider === PROVIDER), patterns, settings);
+			const planned = models.map(m => ({ ...m, provider: PROVIDER, baseUrl: CHARACTER_BASE_URL })) as unknown as Model<Api>[];
+			const visible = filterAvailableModelsByEnabledPatterns(planned, patterns, settings);
 			if (visible.length === 0) warnings.push(`enabledModels is set but matches no character model; add "${PROVIDER}/*" to enabledModels to show them`);
 		}
 		return { files, warnings, changed };

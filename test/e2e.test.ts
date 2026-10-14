@@ -171,6 +171,24 @@ describe("e2e", () => {
 		} finally { fs.rmSync(settingsFile()); }
 	}, 60000);
 
+	test("regression: character/* + enabled original -> NO hidden-group warning (startup)", () => {
+		fs.writeFileSync(settingsFile(), 'enabledModels: [mock/mock-big, "character/*"]\n');
+		try {
+			const r = ask("mock/mock-big");
+			expect(r.code).toBe(0);
+			expect(r.out + r.err).not.toContain("matches no character model");
+		} finally { fs.rmSync(settingsFile()); }
+	}, 60000);
+
+	test("regression: character/* also silent when starting ON a character model", () => {
+		fs.writeFileSync(settingsFile(), 'enabledModels: [mock/mock-big, "character/*"]\n');
+		try {
+			const r = ask("character/carol--mock-big");
+			expect(r.system.includes("CAROL")).toBe(true);
+			expect(r.out + r.err).not.toContain("matches no character model");
+		} finally { fs.rmSync(settingsFile()); }
+	}, 60000);
+
 	test("live: settings edits while running add/remove character models", async () => {
 		const c = await rpc("mock/mock-big");
 		try {

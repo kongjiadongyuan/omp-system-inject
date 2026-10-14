@@ -1,6 +1,6 @@
 {
   "name": "omp-system-inject",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "oh-my-pi plugin: 'character' model group that injects system prompts (replace/prefix/suffix) per model",
   "type": "module",
   "license": "MIT",
